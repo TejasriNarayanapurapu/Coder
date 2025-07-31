@@ -1,73 +1,49 @@
 import streamlit as st
-import openai
-from config import OPENAI_API_KEY
-from github_reader import get_github_issue, get_readme
+from openai import OpenAI
+from config import get_openai_key, get_github_token
+from agent.tools.github_reader import get_github_issue, get_readme
+from agent.tools.code_writer import generate_code_from_issue
 
-openai.api_key = OPENAI_API_KEY
+st.set_page_config(page_title="🤖 HyperCoder", layout="wide")
 
-def login():
-    st.title("🔐 HyperCoder Access")
-    access_code = st.text_input("Enter your access code", type="password")
+st.markdown("<h1 style='text-align: center; color: #4CAF50;'>🤖 HyperCoder</h1>", unsafe_allow_html=True)
 
-    if 'login_error' not in st.session_state:
-        st.session_state['login_error'] = False
+# Load API keys
+openai_key = get_openai_key()
+github_token = get_github_token()
 
-    def authenticate():
-        if access_code == "HyperCoder2025!":
-            st.session_state['authenticated'] = True
-            st.session_state['login_error'] = False
-        else:
-            st.session_state['login_error'] = True
+if not openai_key or not github_token:
+    st.error("❌ API keys are missing! Please check your config.py file.")
+    st.stop()
 
-    st.button("Submit", on_click=authenticate)
-
-    if st.session_state.get('login_error', False):
-        st.error("Invalid access code")
-
-def limited_view():
-    st.title("HyperCoder - Limited Demo")
-    st.write("This is a demo version. Buy access to unlock full features!")
+client = OpenAI(api_key=openai_key)
 
 def summarize_text(text):
-    if not text:
-        return "No content to summarize."
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4",
         messages=[{"role": "user", "content": f"Summarize this:\n\n{text}"}]
     )
-    return response.choices[0].message["content"]
+    return response.choices[0].message.content.strip()
 
 def full_app():
-    st.title("🧠 HyperCoder – AI Engineer-in-a-Box")
+    repo_url = st.text_input("Enter GitHub Issue URL:")
+    if repo_url:
+        try:
+            issue = get_github_issue(repo_url, github_token)
+            st.subheader("🔍 Issue Summary")
+            st.write(issue.get("title", "No title found"))
+            st.write(issue.get("body", "No body found"))
 
-    owner = st.text_input("GitHub Owner (e.g., 'openai')")
-    repo = st.text_input("Repo (e.g., 'gpt-2')")
-    issue_number = st.number_input("Issue Number", step=1)
+            summary = summarize_text(issue.get("body", ""))
+            st.subheader("🧠 AI Summary")
+            st.write(summary)
 
-    if st.button("Read Issue"):
-        issue = get_github_issue(owner, repo, issue_number)
-        readme = get_readme(owner, repo)
+            st.subheader("💡 Generated Code")
+            generated_code = generate_code_from_issue(issue.get("body", ""))
+            st.code(generated_code, language='python')
 
-        st.subheader("🪵 Issue Content")
-        st.markdown(f"### 📝 Title: {issue.get('title', 'N/A')}")
-        labels = issue.get("labels", [])
-        if labels:
-            label_names = [label['name'] for label in labels]
-            st.markdown(f"🏷️ Labels: {', '.join(label_names)}")
-        else:
-            st.markdown("🏷️ Labels: None")
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)}")
 
-        st.write(issue.get("body", "Not found"))
-        st.subheader("🧠 Summary of Issue")
-        summary = summarize_text(issue.get("body", ""))
-        st.write(summary)
-
-        st.subheader("📘 README")
-        st.code(readme)
-
-if 'authenticated' not in st.session_state:
-    login()
-elif st.session_state['authenticated']:
+if __name__ == "__main__":
     full_app()
-else:
-    limited_view()
