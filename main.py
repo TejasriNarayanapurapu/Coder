@@ -1,11 +1,7 @@
 import streamlit as st
-import sys
-import os
 import openai
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from agent.tools.github_reader import get_github_issue, get_readme
-from agent.config import OPENAI_API_KEY
+from config import OPENAI_API_KEY
+from github_reader import get_github_issue, get_readme
 
 openai.api_key = OPENAI_API_KEY
 
@@ -31,10 +27,6 @@ def login():
 def limited_view():
     st.title("HyperCoder - Limited Demo")
     st.write("This is a demo version. Buy access to unlock full features!")
-    st.write("""
-    - You can try entering GitHub owner, repo, and issue number but full summaries and README access are locked.
-    - Contact us at [your email or website] to get full access.
-    """)
 
 def summarize_text(text):
     if not text:
@@ -58,7 +50,6 @@ def full_app():
 
         st.subheader("🪵 Issue Content")
         st.markdown(f"### 📝 Title: {issue.get('title', 'N/A')}")
-
         labels = issue.get("labels", [])
         if labels:
             label_names = [label['name'] for label in labels]
@@ -67,7 +58,6 @@ def full_app():
             st.markdown("🏷️ Labels: None")
 
         st.write(issue.get("body", "Not found"))
-
         st.subheader("🧠 Summary of Issue")
         summary = summarize_text(issue.get("body", ""))
         st.write(summary)
